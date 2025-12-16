@@ -39,11 +39,18 @@ class ProductController extends Controller
 
     // Actualizar un producto
     public function update(Request $request, $id)
-    {
-        $product = Product::findOrFail($id);
-        $product->update($request->all());
-        return response()->json($product, 200);
-    }
+{
+    $request->validate([
+        'nombre' => 'sometimes|required|string|max:255',
+        'precio' => 'sometimes|required|numeric',
+        'stock' => 'sometimes|required|integer',
+        'categoria_id' => 'sometimes|required|exists:categorias,id',
+    ]);
+
+    $product = Product::findOrFail($id);
+    $product->update($request->all());
+    return response()->json($product, 200);
+}
 
     // Eliminar un producto
     public function destroy($id)

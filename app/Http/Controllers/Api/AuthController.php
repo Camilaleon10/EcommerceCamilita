@@ -5,50 +5,62 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
-{
-    // Registro de usuario
+{  // Registro de usuario
     public function register(Request $request)
     {
-        $validated = $request->validate([
+        $data = $request->validate([
             'nombre' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8',
+            'password' => 'required|string|min:6|confirmed',
+            'telefono' => 'nullable|string|max:50',
         ]);
 
         $user = User::create([
-            'nombre' => $validated['nombre'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
+            'nombre' => $data['nombre'],
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+            'telefono' => $data['telefono'] ?? null,
+            'role' => 'cliente',
         ]);
+          // Crear token de autenticación
+        $token = $user->createToken('api-token')->plainTextToken;
 
-        return response()->json(['message' => 'Usuario registrado exitosamente'], 201);
+        return response()->json([
+            'message' => 'Registro exitoso',
+            'user' => $user,
+            'token' => $token,
+        ], 201);
     }
-
-    // Login de usuario
+        // Login de usuario
     public function login(Request $request)
     {
-        $validated = $request->validate([
+        $data = $request->validate([
             'email' => 'required|email',
             'password' => 'required|string',
         ]);
 
-        if (Auth::attempt($validated)) {
-            $token = Auth::user()->createToken('API Token')->plainTextToken;
-            return response()->json(['token' => $token], 200);
+        $user = User::where('email', $data['email'])->first();
+
+        if (!$user || !Hash::check($data['password'], $user->password)) {
+            return response()->json(['message' => 'Credenciales incorrectas'], 401);
         }
+         
+        $token = $user->createToken('api-token')->plainTextToken;
 
-        throw ValidationException::withMessages(['email' => ['Credenciales incorrectas']]);
+        return response()->json([
+            'message' => 'Login exitoso',
+            'user' => $user,
+            'token' => $token,
+        ], 200);
     }
-
-    // Logout de usuario (revocar token)
+         // Logout de usuario
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
+
         return response()->json(['message' => 'Logout exitoso'], 200);
     }
 }

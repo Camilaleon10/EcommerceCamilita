@@ -6,13 +6,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 
-use App\Http\Controllers\Api\CategoriaController;
-use App\Http\Controllers\Api\ProductController;
-use App\Http\Controllers\Api\CartController;
-use App\Http\Controllers\Api\OrderController;
-use App\Http\Controllers\Api\OrderItemController;
-use App\Http\Controllers\Api\PaymentController;
-use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\CategoriaController; // CRUD Categorías
+use App\Http\Controllers\Api\ProductController; // CRUD Productos
+use App\Http\Controllers\Api\CartController; // Carrito de compras
+use App\Http\Controllers\Api\OrderController; // CRUD Pedidos
+use App\Http\Controllers\Api\OrderItemController; // Items del pedido
+use App\Http\Controllers\Api\PaymentController;  // Pagos
+use App\Http\Controllers\Api\InventoryController; // Inventario
+use App\Http\Controllers\Api\AuthController; // Autenticación
+use App\Http\Controllers\Api\ServiceController; // CRUD Servicios
+use App\Http\Controllers\Api\SolicitudController; // CRUD Solicitudes
+
 
 // Test
 Route::get('/ping', fn () => response()->json(['ok' => true]));
@@ -22,7 +26,9 @@ Route::apiResource('categorias', CategoriaController::class);
 
 // CRUD Productos
 // Solo lectura para productos, el resto es para admin
-Route::apiResource('products', ProductController::class)->only(['index', 'show']);
+Route::middleware('auth:sanctum', 'isAdmin')->post('products', [ProductController::class, 'store']);
+// Ruta para actualizar producto (PUT)
+Route::middleware('auth:sanctum', 'isAdmin')->put('products/{id}', [ProductController::class, 'update']);
 // Carrito (rutas típicas)
 Route::get('cart', [CartController::class, 'show']);
 Route::post('cart/add', [CartController::class, 'add']);
@@ -46,7 +52,7 @@ Route::get('payments/{orderId}', [PaymentController::class, 'show']);
 // Inventario
 Route::get('inventory/{productId}', [InventoryController::class, 'show']);
 Route::put('inventory/{productId}', [InventoryController::class, 'update']);
-
+Route::get('/products', [ProductController::class, 'index']); // Verifica que esté usando GET y el método index
 
 // Registro de usuarios sirve para crear usuarios desde Postman
 Route::post('/users', function (Request $request) {
@@ -58,6 +64,7 @@ Route::post('/users', function (Request $request) {
         'telefono' => 'nullable|string|max:50',
         'role' => 'nullable|in:admin,cliente',
     ]);
+
 // Crear el usuario en la base de datos
     $user = User::create([
         'nombre' => $data['nombre'],
@@ -66,6 +73,29 @@ Route::post('/users', function (Request $request) {
         'telefono' => $data['telefono'] ?? null,
         'role' => $data['role'] ?? 'cliente', // si no mandas role, queda cliente
     ]);
-
+    
     return response()->json($user, 201);
 });
+
+// Rutas de autenticación
+Route::post('auth/register', [AuthController::class, 'register']);
+Route::post('auth/login', [AuthController::class, 'login']);
+Route::middleware('auth:sanctum')->post('auth/logout', [AuthController::class, 'logout']);
+// Obtener el usuario autenticado
+Route::middleware('auth:sanctum')->get('auth/me', function (Request $request) {
+    return response()->json($request->user());
+});
+
+// Rutas protegidas para admin (servicios)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::apiResource('servicios', ServiceController::class); // CRUD para servicios
+});
+
+// Rutas protegidas para solicitudes
+Route::middleware('auth:sanctum')->group(function () {
+    Route::apiResource('solicitudes', SolicitudController::class); // CRUD para solicitudes
+});
+
+// Actualizar estado de solicitud
+Route::middleware('auth:sanctum')->patch('solicitudes/{id}/estado', 
+ [SolicitudController::class, 'update']);
